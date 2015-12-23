@@ -1,0 +1,207 @@
+﻿@using TXTextControl.Web
+@using TXTextControl.Web.MVC
+
+@Html.TXTextControl().TextControl(settings =>
+{
+    settings.Dock = DockStyle.Window;
+}).Render()
+
+<style>
+    .insert-table-wizard {
+        background-color: white;
+    }
+
+    .insert-table-wizard table {
+        border-spacing: 3px;
+        border-collapse: separate;
+    }
+
+    .insert-table-wizard td {
+        width: 20px;
+        height: 15px;
+        border: 1px solid black;
+    }
+
+    .custom-menu-item:hover {
+        background-color: #D5E1F2;
+    }
+</style>
+
+<script>
+
+    TXTextControl.addEventListener("ribbonTabsLoaded", function (e) {
+        replaceTableButton();
+    });
+    
+    var m_insertTableMenu;
+
+    function replaceTableButton() {
+        // remove the original InsertTable button
+        $('#btnInsertTable').remove();
+
+        // create a new drop down button
+        var $drpDnBtnInsertTable = $("<div>", { id: "drpDnBtnInsertTable", class: "ribbon-button ribbon-button-big" });
+        var $imageContainer = $("<div>", { class: "ribbon-button-big-image-container" });
+        var $ribbonButtonBigImage = $("<img>", { class: "ribbon-button-big-image", src: "/TXTextControl.Web/Icons/large_32bit/table.png" });
+        var $ribbonButtonBigLabelContainer = $("<div>", { class: "ribbon-button-big-label-container" });
+        var $ribbonButtonLabel = $("<p>", { class: "ribbon-button-label" });
+        var $ribbonButtonLabelText = $("<span>", { class: "ribbon-button-label-text" });
+        var $dropDownArrowLarge = $("<span>", { class: "drop-down-arrow-large" });
+        
+        $imageContainer.append($ribbonButtonBigImage);
+        $drpDnBtnInsertTable.append($imageContainer);
+
+        $ribbonButtonLabelText.html("Table<br>");
+        $dropDownArrowLarge.text("▼");
+
+        $ribbonButtonLabel.append($ribbonButtonLabelText);
+        $ribbonButtonLabel.append($dropDownArrowLarge);
+        $ribbonButtonBigLabelContainer.append($ribbonButtonLabel);
+
+        $drpDnBtnInsertTable.append($ribbonButtonBigLabelContainer);
+
+        $("#ribbonGroupTables div.ribbon-group-content").append($drpDnBtnInsertTable);
+
+        // create the drop down element
+        var $insertTableDropDown = $("<ul>", {
+            id: "insertTableDropDown",
+            class: "dropDownMenu ui-menu ui-widget ui-widget-content ui-corner-all",
+            role: "menu",
+            tabindex: "0",
+            style: "display: none; width: 224px; top: 95px; left: 115px;"
+        });
+
+        // create the table wizard
+        var $mnuItemTableWizard = $("<li>", { id: "mnuItemTableWizard", class: "ui-menu-item", role: "presentation" });
+        var $mnuItemTableWizardlink = $("<a>", { href: "#!", class: "ui-corner-all", tabindex: "-1", role: "menuitem" });
+        var $menuItemCategoryHeader = $("<div>", { class: "menu-item-category-header" });
+
+        $menuItemCategoryHeader.html("<h1 id='tableCaption'>Insert Table</h1>");
+        $mnuItemTableWizardlink.append($menuItemCategoryHeader);
+
+        var $insertTableWizard = $("<div>", { class: "insert-table-wizard" });
+        var $wizardTable = $("<table>", { id: "wizard-table" });
+        
+        // create a 10 x 8 table for the table wizard
+        for (var row = 1; row < 9; row += 1) {
+            var $wizardTableRow = $("<tr>");
+            $wizardTable.append($wizardTableRow);
+
+            for (var col = 1; col < 11; col += 1) {
+                var $wizardTableCol = $("<td>", { id: col + "_" + row, onClick: "getTableFromController(" + col + "," + row + ")", onMouseOver: "selectCells(" + col + "," + row + ")" });
+                $wizardTableRow.append($wizardTableCol);
+            }
+        }
+
+        $insertTableWizard.append($wizardTable);
+        $menuItemCategoryHeader.append($insertTableWizard);
+
+        $mnuItemTableWizard.append($mnuItemTableWizardlink);
+        $insertTableDropDown.append($mnuItemTableWizard);
+        
+        // insert a table button to open the table insert dialog
+        var $mnuItemTableBtn = $("<li>", { onClick: "TXTextControl.enableCommands(); TXTextControl.sendCommand(TXTextControl.Command.ShowDialog,TXTextControl.DialogCategory.TXDialog,TXTextControl.TXDialogType.InsertTableDialog);", onMouseOver: "clearCells()", id: "mnuItemInsertTable", class: "ui-menu-item custom-menu-item", role: "presentation" });
+        var $mnuItemTableBtnlink = $("<a>", { style: "border-top: 1px solid lightgray", href: "#!", class: "ui-corner-all", tabindex: "-1", role: "menuitem" });
+        var $mnuItemTableBtnImageContainer = $("<div>", { class: "large-menu-item-image-container-long-caption" });
+        var $mnuItemTableBtnImageContainerImage = $("<img>", { src: "/TXTextControl.Web/Icons/large_32bit/table.png" });
+        var $mnuItemTableBtnLongCaptionContainer = $("<div>", { class: "large-menu-item-long-caption-container" });
+
+        $mnuItemTableBtnImageContainer.append($mnuItemTableBtnImageContainerImage);
+        $mnuItemTableBtnlink.append($mnuItemTableBtnImageContainer);
+
+        $mnuItemTableBtnLongCaptionContainer.html("<h1>Insert Table</h1><p>Opens a dialog to insert<br>a table into the document.</p>");
+
+        $mnuItemTableBtnlink.append($mnuItemTableBtnLongCaptionContainer);
+
+        $mnuItemTableBtn.append($mnuItemTableBtnlink);
+        $insertTableDropDown.append($mnuItemTableBtn);
+
+        $("#ribbonTabInsert").append($insertTableDropDown);
+
+        m_insertTableMenu = $("#insertTableDropDown");
+        $("#drpDnBtnInsertTable").click(onInsertTableClick);
+    }
+
+    // this function calls teh method GetTableFromController
+    // using AJAX and loads the returned document into
+    // TX Text Control
+    function getTableFromController(cols, rows) {
+
+        var serviceURL = "/Home/GetTableFromController";
+
+        $.ajax({
+            type: "POST",
+            url: serviceURL,
+            contentType: 'application/json',
+            data: JSON.stringify({
+                Columns: cols,
+                Rows: rows
+            }),
+            success: successFunc,
+            error: errorFunc
+        });
+
+        function successFunc(data, status) {
+            TXTextControl.loadSelection(TXTextControl.streamType.InternalUnicodeFormat, data);
+        }
+
+        function errorFunc() {
+            alert('Error');
+        }
+    }
+
+    // clear all cells
+    function clearCells() {
+        $("#wizard-table td").css("background-color", "white").css("border", "1px solid black");
+        $("#tableCaption").text("Insert Table");
+    }
+
+    // select all cells in the selected range
+    function selectCells(col, row) {
+
+        clearCells();
+
+        for (var curRow = 1; curRow <= row; curRow += 1) {
+            for (var curCol = 1; curCol <= col; curCol += 1) {
+                $("#" + curCol + "_" + curRow).css("background-color", "#ffdd9a").css("border", "1px solid orange");
+                $("#tableCaption").text(col + "x" + row + " Table");
+            }
+        }
+    }
+
+    // show the drop down menu
+    function onInsertTableClick(event) {
+
+        hideAllMenus_insertTab();
+
+        // Calculate menu width
+        var elemMenu = document.getElementById("insertTableDropDown");
+
+        m_insertTableMenu.show().position({
+            my: "left top",
+            at: "left bottom",
+            of: event.currentTarget
+        });
+
+        // Register a click outside the menu to close it
+        $(document).one("click", function () {
+            m_insertTableMenu.hide();
+        });
+
+        return false;
+    }
+
+    // this function hides all drop down menus
+    function hideAllMenus_insertTab() {
+        $("#insertImageDropDown").hide();
+        $("#insertBarcodeDropDown").hide();
+        $("#insertHyperlinkDropDown").hide();
+        $("#insertBookmarkDropDown").hide();
+        $("#insertHeaderDropDown").hide();
+        $("#insertFooterDropDown").hide();
+        $("#insertPageNumberDropDown").hide();
+        $("#insertTextFrameDropDown").hide();
+        $("#insertSymbolDropDown").hide();
+    }
+
+</script>
